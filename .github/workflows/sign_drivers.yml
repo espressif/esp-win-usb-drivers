@@ -1,0 +1,47 @@
+name: Sign Windows drivers
+
+on:
+  workflow_dispatch:
+      inputs:
+        driver_version:
+          description: WROVER-B Windows driver version
+          type: string
+          required: true
+
+jobs:
+    wrover-driver:
+        name: Sign driver
+        runs-on: windows-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Sign wrover driver
+              env:
+                CERTIFICATE: ${{ secrets.CERTIFICATE }}
+                CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+
+              shell: pwsh
+              run: ./ci/Sign-File.ps1 -Path ./drivers/wrover_b_driver/wrover_b_driver.cat
+
+            - name: Create GitHub Release
+              id: create_release
+              uses: actions/create-release@v1
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                tag_name: WROVER-B_v${{ inputs.driver_version }}
+                release_name: WROVER-B driver ${{ inputs.driver_version }}
+                draft: false
+                prerelease: false
+
+            - name: Upload Release Asset To Github
+              id: upload-release-asset
+              uses: actions/upload-release-asset@v1
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                upload_url: ${{ steps.create_release.outputs.upload_url }}
+                asset_path: ./drivers/wrover_b_driver
+                asset_name: wrover-b-v${{ inputs.driver_version }}
+                asset_content_type: application/octet-stream

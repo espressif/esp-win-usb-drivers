@@ -4,7 +4,19 @@ on:
   workflow_dispatch:
       inputs:
         driver_version:
-          description: WROVER-B Windows driver version
+          description: Windows driver version (e.g. 1.0.0.0)
+          type: string
+          required: true
+        driver_directory:
+          description: Driver directory in drivers/ (e.g. wrover_b_driver)
+          type: string
+          required: true
+        catalog_file:
+          description: Driver catalog file (e.g. wrover_b_driver.cat)
+          type: string
+          required: true
+        display_name:
+          description: Driver display name - for asset, tag, ... (e.g. WROVER-B)
           type: string
           required: true
 
@@ -22,7 +34,7 @@ jobs:
                 CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
 
               shell: pwsh
-              run: .\ci\Sign-File.ps1 -Path .\drivers\wrover_b_driver\wrover_b_driver.cat
+              run: .\ci\Sign-File.ps1 -Path .\drivers\${{ inputs.driver_directory }}\${{ inputs.catalog_file }}
 
             - name: Create GitHub Release
               id: create_release
@@ -30,13 +42,13 @@ jobs:
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                tag_name: WROVER-B_v${{ inputs.driver_version }}
-                release_name: WROVER-B driver ${{ inputs.driver_version }}
-                draft: false
+                tag_name: ${{ inputs.display_name }}_v${{ inputs.driver_version }}
+                release_name: ${{ inputs.display_name }} driver ${{ inputs.driver_version }}
+                draft: true
                 prerelease: false
 
             - name: Compress files to ZIP
-              run: .\ci\Bundle-Files.ps1 -Path ./drivers/wrover_b_driver/* -DriverName wrover_b_driver
+              run: .\ci\Bundle-Files.ps1 -Path ./drivers/${{ inputs.driver_directory }}/* -DriverName ${{ inputs.driver_directory }}
             
             - name: Upload Release Asset To Github
               id: upload-release-asset
@@ -45,6 +57,6 @@ jobs:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                 upload_url: ${{ steps.create_release.outputs.upload_url }}
-                asset_path: .\drivers\wrover_b_driver.zip
-                asset_name: wrover-b-v${{ inputs.driver_version }}.zip
+                asset_path: .\drivers\${{ inputs.driver_directory }}.zip
+                asset_name: ${{ inputs.display_name }}-v${{ inputs.driver_version }}.zip
                 asset_content_type: application/octet-stream

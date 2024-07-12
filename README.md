@@ -9,6 +9,7 @@ This repository contains Windows USB drivers for Espressif's boards.
 ---
 
 - [Documentation](#documentation)
+    - [Installing the driver](#installing-the-driver)
     - [Adding driver](#adding-driver)
 - [CHANGELOG](#changelog)
 - [License](#license)
@@ -17,6 +18,14 @@ This repository contains Windows USB drivers for Espressif's boards.
 ---
 
 ## Documentation
+
+### Installing the driver
+* Download the driver archive from the [releases section](https://github.com/espressif/esp-win-usb-drivers/releases)
+* Extract the files
+* Right-click the `.inf` file and install the driver
+
+> [!NOTE] 
+> For more info, please see https://learn.microsoft.com/en-us/windows-hardware/drivers/ifs/using-an-inf-file-to-install-a-file-system-filter-driver#right-click-install
 
 ### Adding driver
 1. In the `drivers/` directory create a new one corresponding to the driver

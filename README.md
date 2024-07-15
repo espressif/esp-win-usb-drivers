@@ -51,7 +51,8 @@ In this document, the main changes for this project will be documented.
 
 ## License
 
-This document and the attached source code are released as Free Software under Apache License Version 2 or later. See the accompanying [LICENSE](LICENSE) file for a copy.
+> [!CAUTION]
+> Every source code has it's own LICENSE, especially when it is owned by third parties and are licensed under their own licenses, for more information please see all the accompanying README and LICENSE files for the specific driver.
 
 
 ## Contributing

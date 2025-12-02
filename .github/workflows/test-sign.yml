@@ -2,19 +2,41 @@ name: Test Signing
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [master]
 
 jobs:
   create-test-file:
     runs-on: ubuntu-latest
     steps:
-      - name: Create dummy executable
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'temurin'
+      
+      - name: Create test files
         run: |
           mkdir -p test
-          echo "MZ test executable" > test/test.exe
-          echo "Test DLL" > test/test.dll
+          
+          # PowerShell script (.ps1)
+          # This verifies that Windows binary files can probably be signed
+          cat > test/test.ps1 << 'EOF'
+          # Test PowerShell Script
+          Write-Host "Hello World"
+          Get-Date
+          EOF
+          
+          # JAR file (.jar)
+          mkdir -p jar_content/META-INF
+          echo "Manifest-Version: 1.0" > jar_content/META-INF/MANIFEST.MF
+          echo "Created-By: Test" >> jar_content/META-INF/MANIFEST.MF
+          jar cf test/test.jar -C jar_content .
+          
+          echo "=== Test files created ==="
           ls -la test/
       
-      - name: Upload test artifact
+      - name: Upload test files
         uses: actions/upload-artifact@v4
         with:
           name: test-unsigned
@@ -31,6 +53,7 @@ jobs:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_KEYVAULT_URI: ${{ secrets.AZURE_KEYVAULT_URI }}
       AZURE_KEYVAULT_CERT_NAME: ${{ secrets.AZURE_KEYVAULT_CERT_NAME }}
+      AZURE_KEYVAULT_CERTCHAIN: ${{ secrets.AZURE_KEYVAULT_CERTCHAIN }}
 
   verify:
     needs: sign

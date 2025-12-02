@@ -83,6 +83,7 @@ jobs:
 - `.cat`, `.sys` - Drivers
 - `.msi`, `.cab` - Installers
 - `.ps1` - PowerShell scripts
+- `.jar` - Java archives (signed with jarsigner)
 
 ## Options
 | Input | Required | Default | Description |

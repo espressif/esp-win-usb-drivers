@@ -1,6 +1,6 @@
 name: Sign Artifacts with Azure Key Vault
 
-# Reusable workflow for signing Windows files (.exe, .dll, .cat, .sys, .msi, .ps1)
+# Reusable workflow for signing files (.exe, .dll, .cat, .sys, .msi, .ps1, .jar)
 # using Azure Key Vault and Jsign
 #
 # Usage:
@@ -37,6 +37,9 @@ on:
         required: true
       AZURE_KEYVAULT_CERT_NAME:
         required: true
+      AZURE_KEYVAULT_CERTCHAIN:
+        required: false
+        description: 'Certificate chain (.p7b) content for JAR signing'
 
 jobs:
   sign-artifacts:
@@ -76,11 +79,12 @@ jobs:
             curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
           fi
           
-          # Login using service principal
+          # Login using service principal (--allow-no-subscriptions for Key Vault only access)
           az login --service-principal \
             --username ${{ secrets.AZURE_CLIENT_ID }} \
             --password ${{ secrets.AZURE_CLIENT_SECRET }} \
-            --tenant ${{ secrets.AZURE_TENANT_ID }}
+            --tenant ${{ secrets.AZURE_TENANT_ID }} \
+            --allow-no-subscriptions
           
           echo "Azure authentication successful"
       
@@ -92,11 +96,11 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
       
-      - name: Sign files with Jsign
+      - name: Sign Windows files with Jsign
         env:
           AZURE_TOKEN: ${{ steps.get-token.outputs.token }}
         run: |
-          # Find and sign all files matching the pattern
+          # Find and sign Windows files
           find ./artifacts -type f \( -name "*.exe" -o -name "*.dll" -o -name "*.cat" -o -name "*.sys" -o -name "*.msi" -o -name "*.ps1" \) | while read -r file; do
             echo "Signing: $file"
             
@@ -119,14 +123,61 @@ jobs:
             fi
           done
           
-          echo "All files signed successfully!"
+          echo "Windows files signed!"
+      
+      - name: Sign JAR files with jarsigner
+        env:
+          AZURE_TOKEN: ${{ steps.get-token.outputs.token }}
+          CERT_CHAIN: ${{ secrets.AZURE_KEYVAULT_CERTCHAIN }}
+        run: |
+          # Create certificate chain file if provided
+          CERTCHAIN_ARG=""
+          if [ -n "$CERT_CHAIN" ]; then
+            echo "$CERT_CHAIN" > certchain.p7b
+            CERTCHAIN_ARG="-certchain certchain.p7b"
+            echo "Using certificate chain file"
+          fi
+          
+          # Find and sign JAR files using jarsigner with Jsign's JCA provider
+          find ./artifacts -type f -name "*.jar" | while read -r file; do
+            echo "Signing JAR: $file"
+            
+            jarsigner \
+              -J-cp -Jjsign-7.0.jar \
+              -J--add-modules -Jjava.sql \
+              -providerClass net.jsign.jca.JsignJcaProvider \
+              -providerArg "${{ secrets.AZURE_KEYVAULT_URI }}" \
+              -keystore NONE \
+              -storetype AZUREKEYVAULT \
+              -storepass "$AZURE_TOKEN" \
+              -tsa http://timestamp.digicert.com \
+              $CERTCHAIN_ARG \
+              "$file" \
+              "${{ secrets.AZURE_KEYVAULT_CERT_NAME }}"
+            
+            if [ $? -eq 0 ]; then
+              echo "Successfully signed: $file"
+            else
+              echo "Failed to sign: $file"
+              exit 1
+            fi
+          done
+          
+          echo "JAR files signed!"
       
       - name: Verify signatures
         run: |
-          echo "Verifying signatures..."
+          echo "Verifying Windows file signatures..."
           find ./artifacts -type f \( -name "*.exe" -o -name "*.dll" -o -name "*.cat" -o -name "*.sys" -o -name "*.msi" \) | while read -r file; do
             echo "Verifying: $file"
             java -jar jsign-7.0.jar extract "$file" || true
+          done
+          
+          echo "Verifying JAR signatures..."
+          find ./artifacts -type f -name "*.jar" | while read -r file; do
+            echo "Verifying: $file"
+            # Note: Certificate chain warnings are expected if CA is not in Java truststore
+            jarsigner -verify -verbose "$file" || true
           done
       
       - name: Upload signed artifact
@@ -142,4 +193,5 @@ jobs:
         run: |
           az logout || true
           rm -f jsign-7.0.jar || true
+          rm -f certchain.p7b || true
 

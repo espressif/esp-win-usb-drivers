@@ -1,0 +1,145 @@
+name: Sign Artifacts with Azure Key Vault
+
+# Reusable workflow for signing Windows files (.exe, .dll, .cat, .sys, .msi, .ps1)
+# using Azure Key Vault and Jsign
+#
+# Usage:
+#   uses: espressif/esp-win-usb-drivers/.github/workflows/sign-artifacts.yml@main
+#   with:
+#     artifact-name: unsigned-files
+#   secrets: inherit
+
+on:
+  workflow_call:
+    inputs:
+      artifact-name:
+        description: 'Name of the artifact to download and sign'
+        required: true
+        type: string
+      signed-artifact-name:
+        description: 'Name for the signed artifact (defaults to "{artifact-name}-signed")'
+        required: false
+        type: string
+        default: ""
+      digest-algorithm:
+        description: 'Digest algorithm to use (SHA-256, SHA-384, SHA-512)'
+        required: false
+        type: string
+        default: "SHA-256"
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_CLIENT_SECRET:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_KEYVAULT_URI:
+        required: true
+      AZURE_KEYVAULT_CERT_NAME:
+        required: true
+
+jobs:
+  sign-artifacts:
+    name: Sign Artifacts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ./artifacts
+      
+      - name: Display artifact contents
+        run: |
+          echo "Contents of downloaded artifact:"
+          find ./artifacts -type f
+      
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'temurin'
+      
+      - name: Download Jsign
+        run: |
+          wget -q https://github.com/ebourg/jsign/releases/download/7.0/jsign-7.0.jar
+          echo "Downloaded Jsign 7.0"
+      
+      - name: Authenticate to Azure
+        run: |
+          # Install Azure CLI if not present
+          if ! command -v az &> /dev/null; then
+            curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          fi
+          
+          # Login using service principal
+          az login --service-principal \
+            --username ${{ secrets.AZURE_CLIENT_ID }} \
+            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+          
+          echo "Azure authentication successful"
+      
+      - name: Get Azure Key Vault Access Token
+        id: get-token
+        run: |
+          # Get access token for Key Vault
+          TOKEN=$(az account get-access-token --resource https://vault.azure.net --query accessToken -o tsv)
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+      
+      - name: Sign files with Jsign
+        env:
+          AZURE_TOKEN: ${{ steps.get-token.outputs.token }}
+        run: |
+          # Find and sign all files matching the pattern
+          find ./artifacts -type f \( -name "*.exe" -o -name "*.dll" -o -name "*.cat" -o -name "*.sys" -o -name "*.msi" -o -name "*.ps1" \) | while read -r file; do
+            echo "Signing: $file"
+            
+            java -jar jsign-7.0.jar \
+              --storetype AZUREKEYVAULT \
+              --keystore ${{ secrets.AZURE_KEYVAULT_URI }} \
+              --storepass "$AZURE_TOKEN" \
+              --alias ${{ secrets.AZURE_KEYVAULT_CERT_NAME }} \
+              --alg ${{ inputs.digest-algorithm }} \
+              --tsaurl http://timestamp.digicert.com \
+              --tsretries 3 \
+              --tsretrywait 10 \
+              "$file"
+            
+            if [ $? -eq 0 ]; then
+              echo "Successfully signed: $file"
+            else
+              echo "Failed to sign: $file"
+              exit 1
+            fi
+          done
+          
+          echo "All files signed successfully!"
+      
+      - name: Verify signatures
+        run: |
+          echo "Verifying signatures..."
+          find ./artifacts -type f \( -name "*.exe" -o -name "*.dll" -o -name "*.cat" -o -name "*.sys" -o -name "*.msi" \) | while read -r file; do
+            echo "Verifying: $file"
+            java -jar jsign-7.0.jar extract "$file" || true
+          done
+      
+      - name: Upload signed artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.signed-artifact-name != '' && inputs.signed-artifact-name || format('{0}-signed', inputs.artifact-name) }}
+          path: ./artifacts/
+          retention-days: 30
+          if-no-files-found: error
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          az logout || true
+          rm -f jsign-7.0.jar || true
+

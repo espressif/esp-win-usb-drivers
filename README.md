@@ -11,6 +11,7 @@ This repository contains Windows USB drivers for Espressif's boards.
 - [Documentation](#documentation)
     - [Installing the driver](#installing-the-driver)
     - [Adding driver](#adding-driver)
+- [Signing action](#reusable-windows-signing-action)
 - [CHANGELOG](#changelog)
 - [License](#license)
 - [Contributing](#contributing)
@@ -42,6 +43,54 @@ This repository contains Windows USB drivers for Espressif's boards.
             - Custom driver name which will be displayed in the `Releases` or `Tags`
 4. Test the driver and proceed with actions to get PR merged
 5. Change the draft release to release
+
+---
+# Reusable Windows signing action
+
+This repository provides a reusable GitHub Actions workflow for signing Windows files using Azure Key Vault and [Jsign](https://ebourg.github.io/jsign/).
+
+## Quick Start
+
+**1. Upload your artifacts:**
+```yaml
+- uses: actions/upload-artifact@v4
+  with:
+    name: unsigned-files
+    path: dist/
+```
+
+**2. Call the signing workflow:**
+```yaml
+jobs:
+  sign:
+    uses: espressif/esp-win-usb-drivers/.github/workflows/sign-artifacts.yml@main
+    with:
+      artifact-name: unsigned-files
+    secrets: inherit
+```
+
+**3. Download signed files:**
+```yaml
+- uses: actions/download-artifact@v4
+  with:
+    name: unsigned-files-signed
+    path: ./signed
+```
+
+## Supported File Types
+- `.exe` - Executables
+- `.dll` - Libraries
+- `.cat`, `.sys` - Drivers
+- `.msi`, `.cab` - Installers
+- `.ps1` - PowerShell scripts
+
+## Options
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `artifact-name` | Yes | - | Name of artifact to sign |
+| `signed-artifact-name` | No | `{name}-signed` | Name for signed artifact |
+| `digest-algorithm` | No | `SHA-256` | Hash algorithm (SHA-256, SHA-384, SHA-512) |
+
 
 ---
 

@@ -1,0 +1,50 @@
+name: Test Signing
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-test-file:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create dummy executable
+        run: |
+          mkdir -p test
+          echo "MZ test executable" > test/test.exe
+          echo "Test DLL" > test/test.dll
+          ls -la test/
+      
+      - name: Upload test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-unsigned
+          path: test/
+
+  sign:
+    needs: create-test-file
+    uses: ./.github/workflows/sign-artifacts.yml
+    with:
+      artifact-name: test-unsigned
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_KEYVAULT_URI: ${{ secrets.AZURE_KEYVAULT_URI }}
+      AZURE_KEYVAULT_CERT_NAME: ${{ secrets.AZURE_KEYVAULT_CERT_NAME }}
+
+  verify:
+    needs: sign
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download signed artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: test-unsigned-signed
+          path: ./signed
+      
+      - name: Display results
+        run: |
+          echo "=== Signed files ==="
+          ls -la ./signed/
+          echo "✅ Test sign success!"
+

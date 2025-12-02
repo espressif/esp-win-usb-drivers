@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+## 12/02/2025
+- Added Windows signing reusable action
+
 ## 07/08/2024
 - Added ESP32-S2 driver (WinUSB driver for the right interface)
     - Interface 2 had no driver installed, WinUSB is installed for this interface

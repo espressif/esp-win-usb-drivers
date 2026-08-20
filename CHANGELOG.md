@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+## 08/20/2026
+- Added Windows ARM64 (`NTarm64`) to all WinUSB driver packages so they can install on Copilot+ / Windows 11 ARM64 PCs
+    - USB JTAG coinstallers remain x86/amd64/arm-only; ARM64 uses inbox WinUSB
+- Switched driver catalog signing to [espressif/release-sign](https://github.com/espressif/release-sign) with organization Azure Key Vault secrets
+
 ## 07/08/2024
 - Added ESP32-S2 driver (WinUSB driver for the right interface)
     - Interface 2 had no driver installed, WinUSB is installed for this interface

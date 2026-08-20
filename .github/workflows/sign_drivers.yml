@@ -21,42 +21,50 @@ on:
           required: true
 
 jobs:
-    wrover-driver:
+    sign-driver:
         name: Sign driver
-        runs-on: windows-latest
+        runs-on: ubuntu-latest
+        permissions:
+          contents: write
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
 
-            - name: Sign wrover driver
-              env:
-                CERTIFICATE: ${{ secrets.CERTIFICATE }}
-                CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
-
-              shell: pwsh
-              run: .\ci\Sign-File.ps1 -Path .\drivers\${{ inputs.driver_directory }}\${{ inputs.catalog_file }}
-
-            - name: Create GitHub Release
-              id: create_release
-              uses: actions/create-release@v1
-              env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Sign driver catalog
+              uses: espressif/release-sign@master
               with:
-                tag_name: ${{ inputs.display_name }}_v${{ inputs.driver_version }}
-                release_name: ${{ inputs.display_name }} driver ${{ inputs.driver_version }}
-                draft: true
-                prerelease: false
+                path: ./drivers/${{ inputs.driver_directory }}/${{ inputs.catalog_file }}
+                azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+                azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+                azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+                azure-keyvault-uri: ${{ secrets.AZURE_KEYVAULT_URI }}
+                azure-keyvault-cert-name: ${{ secrets.AZURE_KEYVAULT_CERT_NAME }}
 
             - name: Compress files to ZIP
-              run: .\ci\Bundle-Files.ps1 -Path ./drivers/${{ inputs.driver_directory }}/* -DriverName ${{ inputs.driver_directory }}
-            
-            - name: Upload Release Asset To Github
-              id: upload-release-asset
-              uses: actions/upload-release-asset@v1
+              run: |
+                python - <<'PY'
+                import os
+                import zipfile
+                from pathlib import Path
+
+                driver_dir = Path("drivers") / os.environ["DRIVER_DIRECTORY"]
+                zip_path = Path("drivers") / os.environ["ZIP_NAME"]
+                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
+                    for file_path in driver_dir.rglob("*"):
+                        if file_path.is_file():
+                            archive.write(file_path, file_path.relative_to(driver_dir))
+                print(f"Created {zip_path}")
+                PY
               env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                DRIVER_DIRECTORY: ${{ inputs.driver_directory }}
+                ZIP_NAME: ${{ inputs.display_name }}-v${{ inputs.driver_version }}.zip
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v3
               with:
-                upload_url: ${{ steps.create_release.outputs.upload_url }}
-                asset_path: .\drivers\${{ inputs.driver_directory }}.zip
-                asset_name: ${{ inputs.display_name }}-v${{ inputs.driver_version }}.zip
-                asset_content_type: application/octet-stream
+                tag_name: ${{ inputs.display_name }}_v${{ inputs.driver_version }}
+                name: ${{ inputs.display_name }} driver ${{ inputs.driver_version }}
+                draft: true
+                prerelease: false
+                fail_on_unmatched_files: true
+                files: drivers/${{ inputs.display_name }}-v${{ inputs.driver_version }}.zip

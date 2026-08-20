@@ -24,13 +24,13 @@ This repository contains Windows USB drivers for Espressif's boards.
 * Extract the files
 * Right-click the `.inf` file and install the driver
 
-> [!NOTE] 
+> [!NOTE]
 > For more info, please see https://learn.microsoft.com/en-us/windows-hardware/drivers/ifs/using-an-inf-file-to-install-a-file-system-filter-driver#right-click-install
 
 ### Adding driver
 1. In the `drivers/` directory create a new one corresponding to the driver
 2. Create a PR
-3. Run the workflow `Sign Windows drivers` which will sign the driver and create a draft release, all the parameters must be provided
+3. Run the workflow `Sign Windows drivers` which will sign the driver catalog (via [espressif/release-sign](https://github.com/espressif/release-sign) and organization Azure Key Vault secrets) and create a draft release. All parameters must be provided.
     - Parameters of the workflow:
         - Windows driver version
             - A version of the driver (`[Version]` specified in the INF file)

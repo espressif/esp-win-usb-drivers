@@ -2,11 +2,11 @@
 ---
 minimum_pre_commit_version: 3.3.0                        # Specifies the minimum version of pre-commit required for this configuration
 default_install_hook_types: [pre-commit,commit-msg]      # Default hook types to install if not specified in individual hooks
-default_stages: [commit]
+default_stages: [pre-commit]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace                          # Removes trailing whitespaces from lines
       - id: end-of-file-fixer                            # Ensures files end with a newline
@@ -15,19 +15,19 @@ repos:
         args: ['-f=lf']                                  # Forces files to use LF line endings
 
   - repo: https://github.com/espressif/conventional-precommit-linter
-    rev: v1.6.0
+    rev: v1.11.0
     hooks:
       - id: conventional-precommit-linter                # Lints commit messages for conventional format
         stages: [commit-msg]
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.6
+    rev: v2.4.3
     hooks:
       - id: codespell                                    # Code spell checker
         args: ["--write-changes"]
         additional_dependencies: [tomli]
 
   - repo: https://github.com/espressif/esp-pwsh-check
-    rev: v1.0.0
+    rev: v1.1.0
     hooks:
     -   id: check-powershell-scripts
